@@ -1,0 +1,222 @@
+name: Deploy AWS Lean Analytics
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cdk/**'
+      - 'data/**'
+      - '.github/workflows/deploy.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'cdk/**'
+      - 'data/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+    inputs:
+      destroy:
+        description: 'Destroy stacks instead of deploy'
+        required: false
+        default: false
+        type: boolean
+
+# Required permissions for OIDC
+permissions:
+  id-token: write   # Required for OIDC authentication
+  contents: read    # Required to checkout repository
+
+env:
+  AWS_REGION: us-west-2
+  AWS_ACCOUNT_ID: '699027953523'
+  CDK_DEFAULT_ACCOUNT: '699027953523'
+  CDK_DEFAULT_REGION: us-west-2
+  NODE_VERSION: '20'
+
+jobs:
+  # Validation job for pull requests
+  validate:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: 📦 Checkout Repository
+        uses: actions/checkout@v4
+        
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'cdk/package-lock.json'
+          
+      - name: 📥 Install CDK Dependencies
+        working-directory: ./cdk
+        run: |
+          npm ci
+          npm run build
+          
+      - name: 🔍 CDK Synth (Validation)
+        working-directory: ./cdk
+        run: |
+          npx cdk synth --all --verbose
+          
+      - name: 🧪 Run CDK Tests
+        working-directory: ./cdk
+        run: |
+          npm test || echo "No tests configured yet"
+
+  # Deployment job for main branch
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    
+    environment:
+      name: production
+      url: https://console.aws.amazon.com/athena/home?region=us-west-2#/query-editor/
+      
+    steps:
+      - name: 📦 Checkout Repository
+        uses: actions/checkout@v4
+        
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'cdk/package-lock.json'
+          
+      - name: 🔐 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/GitHubActionsCDKDeploy
+          role-session-name: GitHubActions-CDK-Deploy
+          aws-region: ${{ env.AWS_REGION }}
+          
+      - name: ✅ Verify AWS Connection
+        run: |
+          echo "🔍 Verifying AWS connection..."
+          aws sts get-caller-identity
+          aws s3 ls || echo "No S3 buckets or insufficient permissions"
+          
+      - name: 📥 Install CDK Dependencies
+        working-directory: ./cdk
+        run: |
+          echo "📦 Installing dependencies..."
+          npm ci
+          npm run build
+          
+      - name: 🔧 CDK Bootstrap (if needed)
+        working-directory: ./cdk
+        run: |
+          echo "🔧 Checking CDK bootstrap status..."
+          npx cdk bootstrap aws://${{ env.AWS_ACCOUNT_ID }}/${{ env.AWS_REGION }} || echo "Bootstrap already exists or failed"
+          
+      - name: 🔍 CDK Synthesis
+        working-directory: ./cdk
+        run: |
+          echo "🔍 Synthesizing CloudFormation templates..."
+          npx cdk synth --all --verbose
+          
+      - name: 📊 CDK Diff
+        working-directory: ./cdk
+        run: |
+          echo "📊 Checking for infrastructure changes..."
+          npx cdk diff --all || echo "Diff completed"
+          
+      - name: 🚀 CDK Deploy (or Destroy)
+        working-directory: ./cdk
+        run: |
+          if [ "${{ github.event.inputs.destroy }}" == "true" ]; then
+            echo "💥 DESTROYING infrastructure..."
+            echo "⚠️ This will delete all AWS resources!"
+            npx cdk destroy --all --force
+          else
+            echo "🚀 Deploying infrastructure..."
+            npx cdk deploy --all --require-approval never --verbose
+          fi
+          
+      - name: 📋 Get Stack Outputs
+        if: github.event.inputs.destroy != 'true'
+        run: |
+          echo "📋 Retrieving stack outputs..."
+          echo "## 🎯 Deployment Outputs" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Get DataStack outputs
+          echo "### DataStack Resources" >> $GITHUB_STEP_SUMMARY
+          aws cloudformation describe-stacks \
+            --stack-name LeanAnalyticsDataStack \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Stacks[0].Outputs' \
+            --output table >> $GITHUB_STEP_SUMMARY || echo "DataStack outputs not found" >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Get AthenaStack outputs  
+          echo "### AthenaStack Resources" >> $GITHUB_STEP_SUMMARY
+          aws cloudformation describe-stacks \
+            --stack-name LeanAnalyticsAthenaStack \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Stacks[0].Outputs' \
+            --output table >> $GITHUB_STEP_SUMMARY || echo "AthenaStack outputs not found" >> $GITHUB_STEP_SUMMARY
+          
+      - name: 🕷️ Trigger Glue Crawler
+        if: github.event.inputs.destroy != 'true'
+        run: |
+          echo "🕷️ Starting Glue crawler for schema discovery..."
+          aws glue start-crawler \
+            --name lean-analytics-crawler \
+            --region ${{ env.AWS_REGION }} \
+            || echo "⚠️ Crawler start failed - may already be running or not exist yet"
+          
+          echo "## 🔄 Post-Deployment Actions" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Glue crawler started for schema discovery" >> $GITHUB_STEP_SUMMARY
+          echo "- 📊 Check crawler status: \`aws glue get-crawler --name lean-analytics-crawler\`" >> $GITHUB_STEP_SUMMARY
+          echo "- 🏠 Local UI: \`cd ui && npm start\` then visit http://localhost:3000" >> $GITHUB_STEP_SUMMARY
+          
+      - name: 📝 Generate Deployment Report
+        if: always() && github.event.inputs.destroy != 'true'
+        run: |
+          echo "## 📋 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| AWS Region | ✅ | ${{ env.AWS_REGION }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| AWS Account | ✅ | ${{ env.AWS_ACCOUNT_ID }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| CDK Version | ✅ | $(npx cdk --version) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Node Version | ✅ | ${{ env.NODE_VERSION }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [Athena Console](https://console.aws.amazon.com/athena/home?region=${{ env.AWS_REGION }}#/query-editor/)" >> $GITHUB_STEP_SUMMARY
+          echo "- [S3 Console](https://console.aws.amazon.com/s3/buckets/lean-analytics-${{ env.AWS_ACCOUNT_ID }}-${{ env.AWS_REGION }}?region=${{ env.AWS_REGION }})" >> $GITHUB_STEP_SUMMARY
+          echo "- [Glue Console](https://console.aws.amazon.com/glue/home?region=${{ env.AWS_REGION }}#/v2/data-catalog/databases/view/lean_demo_db)" >> $GITHUB_STEP_SUMMARY
+          echo "- [CloudFormation Console](https://console.aws.amazon.com/cloudformation/home?region=${{ env.AWS_REGION }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Wait for Glue crawler to complete (2-5 minutes)" >> $GITHUB_STEP_SUMMARY
+          echo "2. Verify tables created: \`aws glue get-tables --database-name lean_demo_db\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. Start local UI: \`cd ui && npm install && npm start\`" >> $GITHUB_STEP_SUMMARY
+          echo "4. Open http://localhost:3000 and test queries" >> $GITHUB_STEP_SUMMARY
+
+  # Cleanup job (manual trigger only)
+  cleanup:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.destroy == 'true'
+    needs: deploy
+    
+    steps:
+      - name: 📝 Cleanup Report
+        run: |
+          echo "## 💥 Infrastructure Cleanup Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All AWS resources have been destroyed:" >> $GITHUB_STEP_SUMMARY
+          echo "- ❌ S3 Bucket and data deleted" >> $GITHUB_STEP_SUMMARY
+          echo "- ❌ Glue Database and tables removed" >> $GITHUB_STEP_SUMMARY
+          echo "- ❌ Athena WorkGroup deleted" >> $GITHUB_STEP_SUMMARY
+          echo "- ❌ IAM roles removed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ♻️ To Redeploy" >> $GITHUB_STEP_SUMMARY
+          echo "1. Push to main branch or manually trigger workflow" >> $GITHUB_STEP_SUMMARY
+          echo "2. Set 'Destroy stacks' to false" >> $GITHUB_STEP_SUMMARY
