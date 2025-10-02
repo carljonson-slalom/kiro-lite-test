@@ -6,8 +6,9 @@ This CDK application deploys the infrastructure for the AWS Lean Analytics platf
 
 ### DataStack
 - **S3 Bucket**: Stores CSV datasets and Athena query results
-- **Glue Database**: Data catalog for schema discovery
+- **Glue Database**: Data catalog for schema discovery  
 - **Glue Crawler**: Automated schema discovery and table creation
+- **Deploy Status**: Ready for GitHub Actions deployment
 - **IAM Role**: Permissions for Glue crawler operations
 - **EventBridge Rule**: Daily crawler scheduling
 
