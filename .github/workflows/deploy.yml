@@ -48,12 +48,12 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: 'cdk/package-lock.json'
+          cache-dependency-path: 'cdk/package.json'
           
       - name: 📥 Install CDK Dependencies
         working-directory: ./cdk
         run: |
-          npm ci
+          npm install
           npm run build
           
       - name: 🔍 CDK Synth (Validation)
@@ -84,7 +84,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: 'cdk/package-lock.json'
+          cache-dependency-path: 'cdk/package.json'
           
       - name: 🔐 Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -103,7 +103,7 @@ jobs:
         working-directory: ./cdk
         run: |
           echo "📦 Installing dependencies..."
-          npm ci
+          npm install
           npm run build
           
       - name: 🔧 CDK Bootstrap (if needed)
