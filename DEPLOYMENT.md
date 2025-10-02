@@ -30,6 +30,7 @@ The project is **production-ready** with:
 ✅ **CI/CD Pipeline**: GitHub Actions with OIDC authentication  
 ✅ **Documentation**: Comprehensive READMEs and setup guides  
 ✅ **Security**: No hardcoded credentials, proper IAM roles  
+✅ **OIDC Trust Policy**: Updated for GitHub Actions deployment  
 
 ## 📋 Pre-Push Checklist
 
