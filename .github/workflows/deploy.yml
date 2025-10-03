@@ -87,7 +87,25 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'cdk/package.json'
           
-      - name: 🔐 Configure AWS Credentials
+      - name: � Install jq for debugging
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: 🔍 Show GitHub OIDC claims (debug)
+        run: |
+          set -euo pipefail
+          echo "🔍 Debugging OIDC token claims..."
+          resp=$(curl -sSL -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")
+          token=$(echo "$resp" | jq -r .value)
+          payload=$(echo "$token" | cut -d'.' -f2 | base64 -d 2>/dev/null || true)
+          echo "OIDC payload claims:"
+          echo "$payload" | jq -r '. | {sub, repository, repository_owner, ref, environment, aud}'
+          echo ""
+          echo "Expected role ARN: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/GithubActionsRole-kiro-lite-test-main"
+          echo "Repository: ${{ github.repository }}"
+          echo "Ref: ${{ github.ref }}"
+          
+      - name: �🔐 Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/GithubActionsRole-kiro-lite-test-main
