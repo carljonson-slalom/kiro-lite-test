@@ -89,6 +89,7 @@ ORDER BY o.order_total DESC
 LIMIT 10;
       `.trim(),
     });
+    topOrdersQuery.addDependency(this.workGroup);
 
     // Named Query 2: Returns by customer (LEFT JOIN)
     const returnsByCustomerQuery = new athena.CfnNamedQuery(this, 'ReturnsByCustomerQuery', {
@@ -120,6 +121,7 @@ LEFT JOIN returns r ON o.order_id = r.order_id
 ORDER BY c.customer_name, r.return_date DESC;
       `.trim(),
     });
+    returnsByCustomerQuery.addDependency(this.workGroup);
 
     // Named Query 3: Orders that were returned
     const returnedOrdersQuery = new athena.CfnNamedQuery(this, 'ReturnedOrdersQuery', {
@@ -150,6 +152,7 @@ INNER JOIN customers c ON o.customer_id = c.customer_id
 ORDER BY o.order_date DESC, r.return_date DESC;
       `.trim(),
     });
+    returnedOrdersQuery.addDependency(this.workGroup);
 
     // Store named queries for reference
     this.namedQueries = [
