@@ -51,7 +51,7 @@ new cdk.CfnOutput(dataStack, 'DataBucketName', {
 });
 
 new cdk.CfnOutput(dataStack, 'GlueDatabaseName', {
-  value: dataStack.glueDatabase.databaseName || dataStack.glueDatabase.ref,
+  value: dataStack.glueDatabase.ref,
   description: 'Glue database name for data catalog',
   exportName: 'LeanAnalytics-GlueDatabase',
 });

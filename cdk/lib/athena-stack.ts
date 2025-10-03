@@ -37,9 +37,6 @@ export class AthenaStack extends cdk.Stack {
         // Enforce WorkGroup configuration
         enforceWorkGroupConfiguration: true,
         
-        // Publish CloudWatch metrics
-        publishCloudWatchMetrics: true,
-        
         // Bytes scanned cutoff for cost control (100 MB for demo)
         bytesScannedCutoffPerQuery: 100 * 1024 * 1024,
         
@@ -53,9 +50,8 @@ export class AthenaStack extends cdk.Stack {
         },
       },
       
-      workGroupConfigurationUpdates: {
+      configurationUpdates: {
         enforceWorkGroupConfiguration: true,
-        publishCloudWatchMetrics: true,
       },
       
       tags: [
@@ -168,7 +164,7 @@ ORDER BY o.order_date DESC, r.return_date DESC;
 
     // IAM role for Athena query execution (for local development access)
     const athenaExecutionRole = new iam.Role(this, 'AthenaExecutionRole', {
-      roleName: `LeanAnalytics-AthenaExecution-${this.region}`,
+      roleName: `LeanAnalytics-AthenaExecution-${cdk.Stack.of(this).region}`,
       assumedBy: new iam.CompositePrincipal(
         new iam.ServicePrincipal('athena.amazonaws.com'),
         // Allow developers to assume this role for local development
@@ -197,8 +193,8 @@ ORDER BY o.order_date DESC, r.return_date DESC;
                 'athena:ListDataCatalogs',
               ],
               resources: [
-                `arn:aws:athena:${this.region}:${this.account}:workgroup/${this.workGroup.name}`,
-                `arn:aws:athena:${this.region}:${this.account}:datacatalog/*`,
+                `arn:aws:athena:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:workgroup/${this.workGroup.name}`,
+                `arn:aws:athena:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:datacatalog/*`,
               ],
             }),
             // Glue Data Catalog permissions
@@ -214,9 +210,9 @@ ORDER BY o.order_date DESC, r.return_date DESC;
                 'glue:BatchGetPartition',
               ],
               resources: [
-                `arn:aws:glue:${this.region}:${this.account}:catalog`,
-                `arn:aws:glue:${this.region}:${this.account}:database/${glueDatabase.ref}`,
-                `arn:aws:glue:${this.region}:${this.account}:table/${glueDatabase.ref}/*`,
+                `arn:aws:glue:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:catalog`,
+                `arn:aws:glue:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:database/${glueDatabase.ref}`,
+                `arn:aws:glue:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:table/${glueDatabase.ref}/*`,
               ],
             }),
             // S3 permissions for data access and results
@@ -247,37 +243,37 @@ ORDER BY o.order_date DESC, r.return_date DESC;
     new cdk.CfnOutput(this, 'AthenaWorkGroupOutput', {
       value: this.workGroup.name!,
       description: 'Athena WorkGroup name for query execution',
-      exportName: `${this.stackName}-WorkGroup`,
+      exportName: `${cdk.Stack.of(this).stackName}-WorkGroup`,
     });
 
     new cdk.CfnOutput(this, 'AthenaWorkGroupArnOutput', {
-      value: `arn:aws:athena:${this.region}:${this.account}:workgroup/${this.workGroup.name}`,
-      description: 'Athena WorkGroup ARN',
-      exportName: `${this.stackName}-WorkGroupArn`,
+      value: `arn:aws:athena:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:workgroup/${this.workGroup.name}`,
+      description: 'ARN of the Athena WorkGroup',
+      exportName: `${cdk.Stack.of(this).stackName}-WorkGroupArn`,
     });
 
     new cdk.CfnOutput(this, 'AthenaResultLocationOutput', {
       value: `s3://${dataBucket.bucketName}/athena-results/`,
       description: 'S3 location for Athena query results',
-      exportName: `${this.stackName}-ResultLocation`,
+      exportName: `LeanAnalyticsAthenaStack-ResultLocation`,
     });
 
     new cdk.CfnOutput(this, 'NamedQueriesOutput', {
       value: this.namedQueries.map(q => q.name!).join(', '),
       description: 'Available named queries for analytics',
-      exportName: `${this.stackName}-NamedQueries`,
+      exportName: `LeanAnalyticsAthenaStack-NamedQueries`,
     });
 
     new cdk.CfnOutput(this, 'AthenaExecutionRoleOutput', {
       value: athenaExecutionRole.roleArn,
       description: 'IAM role ARN for Athena query execution',
-      exportName: `${this.stackName}-ExecutionRole`,
+      exportName: `LeanAnalyticsAthenaStack-ExecutionRole`,
     });
 
     new cdk.CfnOutput(this, 'QueryDatabaseOutput', {
       value: glueDatabase.ref,
       description: 'Glue database name for Athena queries',
-      exportName: `${this.stackName}-Database`,
+      exportName: `LeanAnalyticsAthenaStack-Database`,
     });
 
     // Sample queries for testing
@@ -290,7 +286,7 @@ ORDER BY o.order_date DESC, r.return_date DESC;
         'DESCRIBE customers;',
       ].join(' | '),
       description: 'Sample queries to test Athena setup',
-      exportName: `${this.stackName}-SampleQueries`,
+      exportName: `LeanAnalyticsAthenaStack-SampleQueries`,
     });
 
     // Add tags to all resources in this stack

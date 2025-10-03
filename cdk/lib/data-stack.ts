@@ -202,11 +202,6 @@ export class DataStack extends cdk.Stack {
       recrawlPolicy: {
         recrawlBehavior: 'CRAWL_EVERYTHING',
       },
-      
-      // Lineage configuration
-      lineageConfiguration: {
-        crawlerLineageSettings: 'ENABLE',
-      },
     });
 
     // EventBridge rule for daily crawler execution
@@ -238,43 +233,43 @@ export class DataStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'DataBucketNameOutput', {
       value: this.dataBucket.bucketName,
       description: 'S3 bucket name for data storage',
-      exportName: `${this.stackName}-DataBucket`,
+      exportName: `LeanAnalyticsDataStack-DataBucket`,
     });
 
     new cdk.CfnOutput(this, 'DataBucketArnOutput', {
       value: this.dataBucket.bucketArn,
       description: 'S3 bucket ARN for data storage',
-      exportName: `${this.stackName}-DataBucketArn`,
+      exportName: `LeanAnalyticsDataStack-DataBucketArn`,
     });
 
     new cdk.CfnOutput(this, 'GlueDatabaseNameOutput', {
       value: this.glueDatabase.ref,
       description: 'Glue database name for data catalog',
-      exportName: `${this.stackName}-GlueDatabase`,
+      exportName: `LeanAnalyticsDataStack-GlueDatabase`,
     });
 
     new cdk.CfnOutput(this, 'GlueCrawlerNameOutput', {
       value: this.glueCrawler.name!,
       description: 'Glue crawler name for schema discovery',
-      exportName: `${this.stackName}-GlueCrawler`,
+      exportName: `LeanAnalyticsDataStack-GlueCrawler`,
     });
 
     new cdk.CfnOutput(this, 'CrawlerRoleArnOutput', {
       value: this.crawlerRole.roleArn,
       description: 'IAM role ARN for Glue crawler',
-      exportName: `${this.stackName}-CrawlerRole`,
+      exportName: `LeanAnalyticsDataStack-CrawlerRole`,
     });
 
     new cdk.CfnOutput(this, 'DatasetLocationOutput', {
       value: `s3://${this.dataBucket.bucketName}/datasets/`,
       description: 'S3 location of uploaded CSV datasets',
-      exportName: `${this.stackName}-DatasetLocation`,
+      exportName: `LeanAnalyticsDataStack-DatasetLocation`,
     });
 
     new cdk.CfnOutput(this, 'AthenaResultsLocationOutput', {
       value: `s3://${this.dataBucket.bucketName}/athena-results/`,
       description: 'S3 location for Athena query results',
-      exportName: `${this.stackName}-AthenaResultsLocation`,
+      exportName: `LeanAnalyticsDataStack-AthenaResultsLocation`,
     });
 
     // Add tags to all resources in this stack
