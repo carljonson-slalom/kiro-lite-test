@@ -89,7 +89,7 @@ jobs:
       - name: 🔐 Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/GitHubActionsCDKDeploy
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/GithubActionsRole-kiro-lite-test-main
           role-session-name: GitHubActions-CDK-Deploy
           aws-region: ${{ env.AWS_REGION }}
           
