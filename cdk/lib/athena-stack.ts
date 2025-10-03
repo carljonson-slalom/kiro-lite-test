@@ -50,10 +50,6 @@ export class AthenaStack extends cdk.Stack {
         },
       },
       
-      configurationUpdates: {
-        enforceWorkGroupConfiguration: true,
-      },
-      
       tags: [
         {
           key: 'Project',
