@@ -1,5 +1,6 @@
 name: Deploy AWS Lean Analytics
 
+# Deploy infrastructure to AWS using CDK with OIDC authentication
 on:
   push:
     branches: [main]
